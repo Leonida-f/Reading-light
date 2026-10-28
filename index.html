@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Luce Lettura</title>
+  <meta name="description" content="Luce da lettura a tutto schermo: regola luminosità e tono dal bianco all'ambra.">
+  <meta name="theme-color" content="#ffb35c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Luce">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <style>
+    :root {
+      --light: #ffb35c;
+      --panel-bg: rgba(20, 14, 8, 0.72);
+      --panel-fg: #f5e9da;
+      --panel-muted: rgba(245, 233, 218, 0.6);
+      --accent: #ffb35c;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body {
+      background: var(--light);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      color: var(--panel-fg);
+    }
+    #light {
+      position: fixed;
+      inset: 0;
+      background: var(--light);
+    }
+
+    #hint {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: calc(env(safe-area-inset-bottom) + 28px);
+      text-align: center;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+      transition: opacity 0.6s;
+    }
+    #hint.hidden { opacity: 0; }
+
+    #panel {
+      position: fixed;
+      left: 16px; right: 16px;
+      bottom: calc(env(safe-area-inset-bottom) + 16px);
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px 20px 16px;
+      border-radius: 24px;
+      background: var(--panel-bg);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+      transform: translateY(calc(100% + 40px));
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      touch-action: none;
+    }
+    #panel.open { transform: none; opacity: 1; }
+
+    .row { margin-bottom: 18px; }
+    .row-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+    .row-head span:last-child { color: var(--panel-muted); font-variant-numeric: tabular-nums; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 36px;
+      border-radius: 18px;
+      margin: 0;
+      outline: none;
+      touch-action: none;
+    }
+    #brightness { background: linear-gradient(to right, #000, var(--light-full, #ffb35c)); }
+    #warmth { background: linear-gradient(to right, #fff4ea, #ffd6a3, #ffb35c, #ff8a2b, #ff5a10); }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid rgba(0, 0, 0, 0.25);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid rgba(0, 0, 0, 0.25);
+    }
+
+    .presets {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .presets button {
+      flex: 1;
+      height: 44px;
+      border: 0;
+      border-radius: 14px;
+      font: inherit;
+      font-size: 13px;
+      color: #1b120a;
+      cursor: pointer;
+    }
+    .close-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--panel-muted);
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="light"></div>
+  <div id="hint">Tocca per regolare · scorri su/giù per la luminosità</div>
+
+  <div id="panel" aria-hidden="true">
+    <div class="row">
+      <div class="row-head"><span>Luminosità</span><span id="brightness-val"></span></div>
+      <input id="brightness" type="range" min="1" max="100" step="1" aria-label="Luminosità">
+    </div>
+    <div class="row">
+      <div class="row-head"><span>Tono</span><span id="warmth-val"></span></div>
+      <input id="warmth" type="range" min="0" max="100" step="1" aria-label="Tono, dal bianco all'ambra">
+    </div>
+    <div class="presets">
+      <button data-w="0" data-b="100">Bianca</button>
+      <button data-w="45" data-b="70">Calda</button>
+      <button data-w="75" data-b="45">Ambra</button>
+      <button data-w="100" data-b="25">Notte</button>
+    </div>
+    <div class="close-note">Tocca fuori dal pannello per chiuderlo</div>
+  </div>
+
+  <script>
+    (() => {
+      const light = document.getElementById('light');
+      const panel = document.getElementById('panel');
+      const hint = document.getElementById('hint');
+      const bSlider = document.getElementById('brightness');
+      const wSlider = document.getElementById('warmth');
+      const bVal = document.getElementById('brightness-val');
+      const wVal = document.getElementById('warmth-val');
+      const themeMeta = document.querySelector('meta[name=theme-color]');
+
+      const STORAGE_KEY = 'reading-light-v1';
+      const state = { brightness: 80, warmth: 70 };
+      try {
+        Object.assign(state, JSON.parse(localStorage.getItem(STORAGE_KEY)) || {});
+      } catch (e) {}
+
+      // Color temperature (Kelvin) -> RGB, Tanner Helland approximation.
+      function kelvinToRgb(k) {
+        const t = k / 100;
+        let r, g, b;
+        if (t <= 66) {
+          r = 255;
+          g = 99.4708025861 * Math.log(t) - 161.1195681661;
+          b = t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+        } else {
+          r = 329.698727446 * Math.pow(t - 60, -0.1332047592);
+          g = 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+          b = 255;
+        }
+        const c = v => Math.max(0, Math.min(255, v));
+        return [c(r), c(g), c(b)];
+      }
+
+      // Warmth 0 = neutral white (6500K), 100 = deep amber (~1200K).
+      function warmthToRgb(w) {
+        const kelvin = 6500 * Math.pow(1200 / 6500, w / 100);
+        return kelvinToRgb(kelvin);
+      }
+
+      function toHex(rgb) {
+        return '#' + rgb.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+      }
+
+      function warmthLabel(w) {
+        if (w < 15) return 'Bianca';
+        if (w < 40) return 'Neutra calda';
+        if (w < 65) return 'Calda';
+        if (w < 88) return 'Ambra';
+        return 'Ambra profonda';
+      }
+
+      function render() {
+        const full = warmthToRgb(state.warmth);
+        // Perceptual curve so the low end of the slider gives fine control in the dark.
+        const factor = Math.pow(state.brightness / 100, 1.8);
+        const color = toHex(full.map(v => v * factor));
+        document.documentElement.style.setProperty('--light', color);
+        document.documentElement.style.setProperty('--light-full', toHex(full));
+        themeMeta.setAttribute('content', color);
+        bSlider.value = state.brightness;
+        wSlider.value = state.warmth;
+        bVal.textContent = state.brightness + '%';
+        wVal.textContent = warmthLabel(state.warmth);
+        hint.style.color = factor > 0.25 ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.35)';
+      }
+
+      function save() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+      }
+
+      function set(partial) {
+        Object.assign(state, partial);
+        state.brightness = Math.max(1, Math.min(100, Math.round(state.brightness)));
+        state.warmth = Math.max(0, Math.min(100, Math.round(state.warmth)));
+        render();
+        save();
+      }
+
+      bSlider.addEventListener('input', () => set({ brightness: +bSlider.value }));
+      wSlider.addEventListener('input', () => set({ warmth: +wSlider.value }));
+      panel.querySelectorAll('.presets button').forEach(btn => {
+        const rgb = warmthToRgb(+btn.dataset.w);
+        btn.style.background = toHex(rgb);
+        btn.addEventListener('click', () => set({ warmth: +btn.dataset.w, brightness: +btn.dataset.b }));
+      });
+
+      function openPanel(open) {
+        panel.classList.toggle('open', open);
+        panel.setAttribute('aria-hidden', String(!open));
+      }
+
+      // On the light itself: a tap toggles the panel, a vertical drag changes brightness.
+      let drag = null;
+      light.addEventListener('pointerdown', e => {
+        drag = { y: e.clientY, start: state.brightness, moved: false };
+        light.setPointerCapture(e.pointerId);
+      });
+      light.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const dy = drag.y - e.clientY;
+        if (Math.abs(dy) > 8) drag.moved = true;
+        if (drag.moved) set({ brightness: drag.start + (dy / window.innerHeight) * 120 });
+      });
+      light.addEventListener('pointerup', () => {
+        if (drag && !drag.moved) openPanel(!panel.classList.contains('open'));
+        drag = null;
+      });
+      light.addEventListener('pointercancel', () => { drag = null; });
+
+      setTimeout(() => hint.classList.add('hidden'), 4000);
+
+      // Keep the screen awake while the light is on.
+      let wakeLock = null;
+      async function requestWakeLock() {
+        try {
+          if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+            wakeLock = await navigator.wakeLock.request('screen');
+          }
+        } catch (e) {}
+      }
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') requestWakeLock();
+      });
+      // Some browsers only grant the lock after a user gesture.
+      document.addEventListener('pointerdown', () => { if (!wakeLock || wakeLock.released) requestWakeLock(); });
+      requestWakeLock();
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>
